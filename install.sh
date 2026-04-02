@@ -31,7 +31,7 @@ pacstrap -K /mnt \
 base linux linux-firmware amd-ucode \
 btrfs-progs sudo openssh git curl \
 zellij nvim zenith \
-bat eza zoxide delta fd ripgrep dua procs sd \
+bat eza zoxide fd ripgrep procs sd \
 rsync unzip zip man-db man-pages less
 
 genfstab -U /mnt >> /mnt/etc/fstab
