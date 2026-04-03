@@ -123,6 +123,10 @@ sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 # Временный пароль root (для emergency mode – потом удалить в post-install.sh)
 echo "root:archtemporary" | chpasswd
 
+# === ИСПРАВЛЕНИЕ: создаём vconsole.conf и добавляем модуль btrfs ===
+echo "KEYMAP=us" > /etc/vconsole.conf
+echo 'MODULES=(btrfs)' > /etc/mkinitcpio.conf.d/btrfs.conf
+
 # === ИСПРАВЛЕНИЕ: добавляем модуль btrfs в initramfs и пересобираем ===
 echo 'MODULES=(btrfs)' > /etc/mkinitcpio.conf.d/btrfs.conf
 mkinitcpio -P
