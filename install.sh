@@ -25,17 +25,7 @@ fi
 echo "[1] NETWORK SETUP"
 IFACE=$(ls /sys/class/net | grep -v lo | head -n1)
 ip link set "$IFACE" up
-pacman -Sy --noconfirm networkmanager
-systemctl start NetworkManager
-systemctl start NetworkManager
-nmcli device connect "$IFACE"
-
-sleep 3
-if ! ping -c 1 archlinux.org >/dev/null 2>&1; then
-    echo "[FATAL] No network"
-    exit 1
-fi
-echo "[OK] Network: $IFACE"
+dhcpcd "$IFACE"
 
 # ===============================
 #  MIRRORS
@@ -95,7 +85,6 @@ echo "[4] PACSTRAP BASE SYSTEM"
 
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Sy --noconfirm
 
 pacstrap -K /mnt base linux linux-firmware amd-ucode btrfs-progs sudo openssh git curl networkmanager iwd snapper snap-pac --overwrite "*"
 
