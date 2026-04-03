@@ -92,11 +92,12 @@ mount $EFI /mnt/boot
 #  BASE INSTALL
 # ===============================
 echo "[4] PACSTRAP BASE SYSTEM"
-pacstrap -K /mnt \
-base linux linux-firmware amd-ucode \
-btrfs-progs sudo openssh git curl \
-networkmanager iwd \
-snapper snap-pac
+
+pacman-key --init
+pacman-key --populate archlinux
+pacman -Sy --noconfirm
+
+pacstrap -K /mnt base linux linux-firmware amd-ucode btrfs-progs sudo openssh git curl networkmanager iwd snapper snap-pac --overwrite "*"
 
 genfstab -U /mnt >> /mnt/etc/fstab
 
