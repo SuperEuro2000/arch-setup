@@ -44,18 +44,8 @@ cat > /etc/pacman.d/mirrorlist <<EOL
 ## Russia (first priority)
 Server = http://mirror.kamtv.ru/archlinux/\$repo/os/\$arch
 Server = https://mirror.kamtv.ru/archlinux/\$repo/os/\$arch
-Server = http://mirror.kpfu.ru/archlinux/\$repo/os/\$arch
-Server = https://mirror.kpfu.ru/archlinux/\$repo/os/\$arch
-Server = http://ru.mirrors.cicku.me/archlinux/\$repo/os/\$arch
-Server = https://ru.mirrors.cicku.me/archlinux/\$repo/os/\$arch
-Server = http://mirror.yandex.ru/archlinux/\$repo/os/\$arch
-Server = https://mirror.yandex.ru/archlinux/\$repo/os/\$arch
-
 ## Latvia (fallback)
 Server = http://ftp.linux.edu.lv/archlinux/\$repo/os/\$arch
-Server = https://ftp.linux.edu.lv/archlinux/\$repo/os/\$arch
-Server = http://archlinux.koyanet.lv/archlinux/\$repo/os/\$arch
-Server = https://archlinux.koyanet.lv/archlinux/\$repo/os/\$arch
 EOL
 
 # ===============================
@@ -107,19 +97,19 @@ echo "[5] CHROOT CONFIG"
 arch-chroot /mnt /bin/bash <<EOF
 set -eux
 
-# TIMEZONE
+# Время
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 hwclock --systohc
 
-# LOCALE
+# Локаль
 echo "$LOCALE UTF-8" >> /etc/locale.gen
 locale-gen
 echo "LANG=$LOCALE" > /etc/locale.conf
 
-# HOSTNAME
+# Имя хоста
 echo "$HOSTNAME" > /etc/hostname
 
-# USER
+# Пользователь и SSH
 useradd -m -G wheel -s /bin/bash $USERNAME
 mkdir -p /home/$USERNAME/.ssh
 echo "$SSH_PUB_KEY" > /home/$USERNAME/.ssh/authorized_keys
@@ -127,20 +117,27 @@ chown -R $USERNAME:$USERNAME /home/$USERNAME/.ssh
 chmod 700 /home/$USERNAME/.ssh
 chmod 600 /home/$USERNAME/.ssh/authorized_keys
 
-# SUDO
+# SUDO (без пароля для wheel – удобно, но можно убрать позже)
 sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
-# BOOTLOADER (systemd-boot)
+# Временный пароль root (для emergency mode – потом удалить в post-install.sh)
+echo "root:archtemporary" | chpasswd
+
+# === ИСПРАВЛЕНИЕ: добавляем модуль btrfs в initramfs и пересобираем ===
+echo 'MODULES=(btrfs)' > /etc/mkinitcpio.conf.d/btrfs.conf
+mkinitcpio -P
+
+# Загрузчик systemd-boot
 bootctl install
 
-UUID=\$(blkid -s UUID -o value $ROOT)
+UUID_ROOT=\$(blkid -s UUID -o value $ROOT)
 
 cat > /boot/loader/entries/arch.conf <<EOL
 title Arch Linux
 linux /vmlinuz-linux
 initrd /amd-ucode.img
 initrd /initramfs-linux.img
-options root=UUID=\$UUID rw,subvol=@
+options root=UUID=\$UUID_ROOT rw subvol=@
 EOL
 
 cat > /boot/loader/loader.conf <<EOL
@@ -149,17 +146,14 @@ timeout 3
 editor no
 EOL
 
-# SSH HARDENING
+# SSH – только по ключу
 sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
 
-# ENABLE SERVICES
+# Включаем сервисы
 systemctl enable sshd
-systemctl enable NetworkManager  # включаем, но в Live ISO не нужен
+systemctl enable NetworkManager
 
 EOF
 
 echo "[DONE] Installation complete. Reboot now."
-
-echo "⚠️  Reminder: Run snapper create-config after first SSH login:"
-echo "sudo snapper -c root create-config / && sudo systemctl enable snapper-timeline.timer snapper-cleanup.timer"
