@@ -8,6 +8,8 @@ DISK="/dev/nvme0n1"
 HOSTNAME="rch"
 USERNAME="m"
 SSH_PUB_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoV8lFVHA2O965fslT+OdBhNb2XJdKY1tls0TlMUAxV supereuro2000@outlook.com"
+TIMEZONE="Asia/Yekaterinburg"
+LOCALE="en_US.UTF-8"
 
 # ===============================
 #  PRECHECKS
@@ -26,6 +28,13 @@ echo "[1] NETWORK SETUP"
 IFACE=$(ls /sys/class/net | grep -v lo | head -n1)
 ip link set "$IFACE" up
 dhcpcd "$IFACE"
+
+sleep 3
+if ! ping -c 1 archlinux.org >/dev/null 2>&1; then
+    echo "[FATAL] No network"
+    exit 1
+fi
+echo "[OK] Network: $IFACE"
 
 # ===============================
 #  MIRRORS
@@ -82,34 +91,35 @@ mount $EFI /mnt/boot
 #  BASE INSTALL
 # ===============================
 echo "[4] PACSTRAP BASE SYSTEM"
-
 pacman-key --init
 pacman-key --populate archlinux
 
-pacstrap -K /mnt base linux linux-firmware amd-ucode btrfs-progs sudo openssh git curl networkmanager iwd snapper snap-pac --overwrite "*"
+pacstrap -K /mnt base linux linux-firmware amd-ucode \
+btrfs-progs sudo openssh git curl networkmanager iwd snapper snap-pac \
+--overwrite "*"
 
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # ===============================
-#  CONFIGURATION
+#  CONFIGURATION (CHROOT)
 # ===============================
 echo "[5] CHROOT CONFIG"
 arch-chroot /mnt /bin/bash <<EOF
 set -eux
 
-# Timezone
-ln -sf /usr/share/zoneinfo/Asia/Yekaterinburg /etc/localtime
+# TIMEZONE
+ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 hwclock --systohc
 
-# Locale
-echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+# LOCALE
+echo "$LOCALE UTF-8" >> /etc/locale.gen
 locale-gen
-echo "LANG=en_US.UTF-8" > /etc/locale.conf
+echo "LANG=$LOCALE" > /etc/locale.conf
 
-# Hostname
+# HOSTNAME
 echo "$HOSTNAME" > /etc/hostname
 
-# User and SSH
+# USER
 useradd -m -G wheel -s /bin/bash $USERNAME
 mkdir -p /home/$USERNAME/.ssh
 echo "$SSH_PUB_KEY" > /home/$USERNAME/.ssh/authorized_keys
@@ -117,12 +127,12 @@ chown -R $USERNAME:$USERNAME /home/$USERNAME/.ssh
 chmod 700 /home/$USERNAME/.ssh
 chmod 600 /home/$USERNAME/.ssh/authorized_keys
 
-# Sudoers
+# SUDO
 sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
-visudo -cf || echo "[WARN] sudoers check failed"
 
-# boot loader (systemd-boot)
+# BOOTLOADER (systemd-boot)
 bootctl install
+
 UUID=\$(blkid -s UUID -o value $ROOT)
 
 cat > /boot/loader/entries/arch.conf <<EOL
@@ -130,7 +140,7 @@ title Arch Linux
 linux /vmlinuz-linux
 initrd /amd-ucode.img
 initrd /initramfs-linux.img
-options root=UUID=\$UUID rw
+options root=UUID=\$UUID rw,subvol=@
 EOL
 
 cat > /boot/loader/loader.conf <<EOL
@@ -139,20 +149,17 @@ timeout 3
 editor no
 EOL
 
-# SSH hardening
+# SSH HARDENING
 sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
 
-# Enable services
-systemctl enable NetworkManager
+# ENABLE SERVICES
 systemctl enable sshd
-
-# Snapper
-snapper -c root create-config /
-chmod 750 /.snapshots
-systemctl enable snapper-timeline.timer
-systemctl enable snapper-cleanup.timer
+systemctl enable NetworkManager  # включаем, но в Live ISO не нужен
 
 EOF
 
 echo "[DONE] Installation complete. Reboot now."
+
+echo "⚠️  Reminder: Run snapper create-config after first SSH login:"
+echo "sudo snapper -c root create-config / && sudo systemctl enable snapper-timeline.timer snapper-cleanup.timer"
