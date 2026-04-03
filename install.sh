@@ -25,6 +25,8 @@ fi
 echo "[1] NETWORK SETUP"
 IFACE=$(ls /sys/class/net | grep -v lo | head -n1)
 ip link set "$IFACE" up
+pacman -Sy --noconfirm networkmanager
+systemctl start NetworkManager
 systemctl start NetworkManager
 nmcli device connect "$IFACE"
 

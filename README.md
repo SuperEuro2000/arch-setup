@@ -1,10 +1,10 @@
-# ▶️ Как запускать (реально рабочий поток)
+# Как запускать
 
 ## 1. В Live ISO:
 
 ```bash
 pacman -Sy git
-git clone https://github.com/you/arch-setup
+git clone https://github.com/SuperEuro2000/arch-setup
 cd arch-setup
 chmod +x install.sh
 ./install.sh
